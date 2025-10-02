@@ -1,0 +1,12 @@
+INSTRUCCIONES.txt
+
+Contenido del paquete:
+- README.md (documentación principal)
+- evidencias/README_evidencias.md (explicación de capturas)
+- apply_all_and_push.ps1 (PowerShell script para aplicar y pushear ramas)
+
+Cómo usar:
+1) Copia este paquete dentro de tu máquina.
+2) Abre PowerShell y navega al directorio raíz de tu repo (ej: C:\Users\User\sql-injection-lab)
+3) Ejecuta: .\apply_all_and_push.ps1 y responde la ruta si te la pide.
+Nota: el script sobrescribe README.md y crea ramas. Revisa antes de pushear si lo deseas.

@@ -1,0 +1,134 @@
+﻿<#
+Applying README and evidences to local repo, creating branches and pushing to origin.
+Usage: Open PowerShell, navigate to the root of your local repo (e.g. C:\Users\User\sql-injection-lab)
+Run: .\apply_all_and_push.ps1
+#>
+
+param(
+    [string]$RepoPath = ""
+)
+
+if (-not $RepoPath) {
+    $RepoPath = Read-Host "Ruta completa del repo local (ej: C:\Users\User\sql-injection-lab)"
+}
+
+if (-not (Test-Path $RepoPath)) {
+    Write-Host "La ruta especificada no existe: $RepoPath" -ForegroundColor Red
+    exit 1
+}
+
+Set-Location $RepoPath
+
+# Write README.md (will overwrite)
+$readmeContent = @"
+# Laboratorio SQL Injection - AnÃ¡lisis de Vulnerabilidades
+
+**Repositorio del laboratorio (fork / entrega):**  
+- Fork con la aplicaciÃ³n vulnerable (uso para pruebas): `https://github.com/JuanFer2004/sql-injection-lab`  
+- Repositorio de entrega final: `https://github.com/JuanFer2004/actividad`
+
+## InformaciÃ³n del Equipo
+- **Integrante 1:** Juan Fernando Bueno Torres â€” `@JuanFer2004`  
+- **Integrante 2:** NOMBRE COMPLETO â€” `@GITHUB_USER2`  
+- **Fecha de entrega:** YYYY-MM-DD
+
+(Editar las partes en MAYÃšSCULAS antes de subir)
+"@
+$readmePath = Join-Path $RepoPath "README.md"
+$readmeContent | Out-File -Encoding utf8 $readmePath -Force
+Write-Host "README.md escrito." -ForegroundColor Green
+
+# Create evidencias structure
+New-Item -ItemType Directory -Path .\evidencias\payloads -Force | Out-Null
+New-Item -ItemType Directory -Path .\evidencias\screenshots -Force | Out-Null
+
+# Create payload files if missing
+$payloads = @{
+    "login.txt" = "admin' --`r`n' OR '1'='1' --"
+    "union.txt" = "1 UNION SELECT 1, username, password FROM users --"
+    "blind.txt" = "1' AND SUBSTR((SELECT password FROM users WHERE username='admin'),1,1)='a' --"
+}
+foreach ($k in $payloads.Keys) {
+    $p = Join-Path $RepoPath ("evidencias\payloads\" + $k)
+    if (-not (Test-Path $p)) {
+        $payloads[$k] | Out-File -Encoding utf8 $p
+        Write-Host "Creado $k" -ForegroundColor Cyan
+    } else {
+        Write-Host "$k ya existe, no se sobrescribiÃ³." -ForegroundColor Yellow
+    }
+}
+
+# Create README_evidencias.md if missing
+$revid = Join-Path $RepoPath "evidencias\README_evidencias.md"
+if (-not (Test-Path $revid)) {
+    @"
+# README_evidencias
+
+Este archivo explica cada evidencia incluida en la carpeta `evidencias/screenshots/` y los payloads usados (en `evidencias/payloads/`).
+
+--
+
+1) login_bypass_01.png
+- Fecha / hora: YYYY-MM-DD HH:MM
+- Endpoint probado: POST /login
+- Payload usado:
+admin' --
+' OR '1'='1' --
+
+2) union_01.png
+- Endpoint probado: GET /items?id=1
+- Payload usado:
+1 UNION SELECT 1, username, password FROM users --
+
+3) blind_01.png
+- Endpoint probado: GET /profile?id=1
+- Payload used (boolean/time):
+1' AND SUBSTR((SELECT password FROM users WHERE username='admin'),1,1)='a' --
+1' AND IF(SUBSTR((SELECT password FROM users WHERE username='admin'),1,1)='a', SLEEP(5), 0) --
+
+AsegÃºrate de sustituir las fechas y observaciones por las reales antes de entregar.
+"@ | Out-File -Encoding utf8 $revid -Force
+    Write-Host "README_evidencias.md creado." -ForegroundColor Green
+} else {
+    Write-Host "README_evidencias.md ya existe." -ForegroundColor Yellow
+}
+
+# Attempt to copy screenshots from Downloads (pattern: login/union/blind)
+$downloads = Join-Path $env:USERPROFILE "Downloads"
+Get-ChildItem -Path $downloads -Filter "*login*.png" -ErrorAction SilentlyContinue | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination (Join-Path $RepoPath "evidencias\screenshots\") -Force
+}
+Get-ChildItem -Path $downloads -Filter "*union*.png" -ErrorAction SilentlyContinue | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination (Join-Path $RepoPath "evidencias\screenshots\") -Force
+}
+Get-ChildItem -Path $downloads -Filter "*blind*.png" -ErrorAction SilentlyContinue | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination (Join-Path $RepoPath "evidencias\screenshots\") -Force
+}
+
+Write-Host "Intento de copiar screenshots desde Downloads completado (si existÃ­an archivos coincidentes)." -ForegroundColor Green
+
+# Git: create branches, commit and push
+git --version 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "git no disponible. Instala git y vuelve a intentar." -ForegroundColor Red
+    exit 1
+}
+
+# branch readme
+if ((git rev-parse --abbrev-ref HEAD) -ne "feat/readme") {
+    git checkout -b feat/readme 2>$null
+} 
+git add README.md
+git commit -m "feat: add README for SQL Injection lab (entrega)" 2>$null
+git push -u origin feat/readme
+
+# branch evidencias
+if ((git rev-parse --abbrev-ref HEAD) -ne "feat/evidencias") {
+    \#\ Intentar\ hacer\ checkout\ a\ la\ rama;\ si\ falla,\ crearla\n\$null\ =\ git\ checkout\ feat/evidencias\ 2>\$null\nif\ \(\$LASTEXITCODE\ -ne\ 0\)\ \{\n\ \ \ \ git\ checkout\ -b\ feat/evidencias\n}
+}
+git add evidencias/
+git commit -m "docs: add README_evidencias and payloads/screenshots" 2>$null
+git push -u origin feat/evidencias
+
+Write-Host "Todo listo. Revisa las ramas feat/readme y feat/evidencias en GitHub y crea PRs." -ForegroundColor Green
+
